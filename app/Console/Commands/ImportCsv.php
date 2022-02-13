@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Customer;
+use App\Models\CustomerRepository;
 use Illuminate\Console\Command;
 use League\Csv\Reader;
 
@@ -10,15 +11,17 @@ class ImportCsv extends Command {
     public $delimiter = ",";
     public $failed = [];
 
+    protected $repository;
     protected $signature = "import:csv";
     protected $description = "Импорт данных из файла в базу с валидацией";
 
-    public function __construct() {
+    public function __construct(CustomerRepository $repository) {
+        $this->repository = $repository;
         parent::__construct();
     }
 
     public function handle() {
-        Customer::truncate();
+        $this->repository->truncate();
 
         $file = storage_path("app/public/random.csv");
 
@@ -50,45 +53,13 @@ class ImportCsv extends Command {
 
             $prepared = array_combine($header, $body);
 
-            $validated = $this->validateData($prepared);
+            $validated = $this->repository->validateData($prepared);
 
-            if ($validated) {
-                $this->createCustomer($validated);
+            if (isset($validated["error"])) {
+                $this->failed[] = $validated;
+            } else {
+                $this->repository->create($prepared);
             }
         }
-    }
-
-    public function validateData($prepared) {
-        // валидация емайла
-        if (!filter_var($prepared["email"], FILTER_VALIDATE_EMAIL)) {
-            $prepared["error"] = "Некорректный email";
-            $this->failed[] = $prepared;
-
-            return false;
-        }
-
-        // проверка возраста
-        $prepared["age"] = (int) $prepared["age"];
-        if (!(($prepared["age"] >= 18) && ($prepared["age"] <= 99))) {
-            $prepared["error"] = "Некорректный возраст";
-            $this->failed[] = $prepared;
-
-            return false;
-        }
-
-        // проверка локации
-        if (!$prepared["location"]) {
-            $prepared["location"] = "Unknown";
-        }
-
-        return $prepared;
-    }
-
-    public function createCustomer($validated) {
-        // в идеале локация должна жить в отдельной таблице, а в Customer только location_id.
-
-        $customer = new Customer();
-        $customer->fill($validated);
-        $customer->save();
     }
 }
