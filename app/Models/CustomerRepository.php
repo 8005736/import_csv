@@ -2,9 +2,7 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-
-class CustomerRepository extends Model {
+class CustomerRepository {
     public function create($array) {
         // в идеале локация должна жить в отдельной таблице, а в Customer только location_id.
 
